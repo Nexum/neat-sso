@@ -18,5 +18,6 @@
     "neat-base": "^1.x.x"
   },
   "dependencies": {
+    "request": "^2.79.0"
   }
 }
