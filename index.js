@@ -5,7 +5,7 @@ const Module = require("neat-base").Module;
 const Tools = require("neat-base").Tools;
 const request = require('request');
 const Promise = require("bluebird");
-
+const crypto = require("crypto");
 
 module.exports = class SSO extends Module {
 
@@ -26,14 +26,16 @@ module.exports = class SSO extends Module {
 
             if (this.webserverModule) {
                 this.webserverModule.addRoute("post", "/sso/sync", (req, res) => {
-
+                    this.log.debug("Starting sync");
                     if (!this.config.sync || !this.config.sync.length) {
                         req.status(500);
+                        this.log.warn("No sync configured!");
                         return res.end("No sync configured!");
                     }
 
                     if (!req.body.sync || !this.isValidSyncAuth(req.body.sync.auth)) {
                         req.status(401);
+                        this.log.warn("Unauthorised sync attempt");
                         return res.end("Not authorized");
                     }
 
@@ -51,6 +53,7 @@ module.exports = class SSO extends Module {
                                 obj[path] = doc.get(path);
                             }
 
+                            this.log.debug("Found user " + doc.get("username") + " for sync with email " + doc.get("email"));
                             result.push(obj);
                         }
 
@@ -103,7 +106,7 @@ module.exports = class SSO extends Module {
         });
     }
 
-    syncUserByUsername(username) {
+    syncUserByUsername(username, password) {
         this.log.debug("Syncing user with username " + username);
         let userModel = this.dbModule.getModel("user");
         let synced = false;
@@ -130,6 +133,15 @@ module.exports = class SSO extends Module {
                                 doc.set(key, syncedFields[key]);
                             }
 
+                            // LEGACY PASSWORD CHECKS
+                            // @TODO make this come from a config or something so people can easily extend it
+                            if (syncedFields.password) {
+                                if (this.getLegacyPasswordHash(password, syncedFields.salt) === syncedFields.password) {
+                                    this.log.debug("Found OLD password strategy, using given password!");
+                                    syncedFields.password = password;
+                                }
+                            }
+
                             this.log.debug("Synced user " + syncedFields.username);
                             synced = true;
                             return doc.save({validateBeforeSave: false});
@@ -147,7 +159,7 @@ module.exports = class SSO extends Module {
         });
     }
 
-    syncUserByEmail(email) {
+    syncUserByEmail(email, password) {
         this.log.debug("Syncing user with email " + email);
         let userModel = this.dbModule.getModel("user");
         let synced = false;
@@ -162,6 +174,12 @@ module.exports = class SSO extends Module {
 
                 return Promise.map(data, (syncedUsers) => {
                     return Promise.map(syncedUsers, (syncedFields) => {
+
+                        if (!syncedFields.email) {
+                            this.log.warn("Got user with empty email while syncing!");
+                            return Promise.resolve(false);
+                        }
+
                         return userModel.findOne({
                             email: syncedFields.email
                         }).then((doc) => {
@@ -172,6 +190,15 @@ module.exports = class SSO extends Module {
 
                             for (let key in syncedFields) {
                                 doc.set(key, syncedFields[key]);
+                            }
+
+                            // LEGACY PASSWORD CHECKS
+                            // @TODO make this come from a config or something so people can easily extend it
+                            if (syncedFields.password) {
+                                if (this.getLegacyPasswordHash(password, syncedFields.salt) === syncedFields.password) {
+                                    this.log.debug("Found OLD password strategy, using given password!");
+                                    doc.set("password", password);
+                                }
                             }
 
                             this.log.debug("Synced user " + syncedFields.email);
@@ -188,5 +215,9 @@ module.exports = class SSO extends Module {
                 resolve(synced);
             });
         });
+    }
+
+    getLegacyPasswordHash(password, salt) {
+        return crypto.createHash('md5').update(crypto.createHash('md5').update(password, 'utf8').digest('hex') + crypto.createHash('md5').update(salt, 'utf8').digest('hex'), 'utf8').digest('hex');
     }
 }
