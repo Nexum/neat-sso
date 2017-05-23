@@ -124,6 +124,9 @@ module.exports = class SSO extends Module {
                         return userModel.findOne({
                             username: syncedFields.username
                         }).then((doc) => {
+                            if (doc) {
+                                return;
+                            }
 
                             if (!doc) {
                                 doc = new userModel();
@@ -183,6 +186,9 @@ module.exports = class SSO extends Module {
                         return userModel.findOne({
                             email: syncedFields.email
                         }).then((doc) => {
+                            if (doc) {
+                                return;
+                            }
 
                             if (!doc) {
                                 doc = new userModel();
