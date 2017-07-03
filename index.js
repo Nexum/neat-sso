@@ -146,8 +146,13 @@ module.exports = class SSO extends Module {
                             }
 
                             this.log.debug("Synced user " + syncedFields.username);
-                            synced = true;
-                            return doc.save({validateBeforeSave: false});
+                            return doc.save().then(() => {
+                                synced = true;
+                                return;
+                            }, () => {
+                                synced = false;
+                                return;
+                            });
                         });
                     });
                 });
@@ -208,8 +213,13 @@ module.exports = class SSO extends Module {
                             }
 
                             this.log.debug("Synced user " + syncedFields.email);
-                            synced = true;
-                            return doc.save({validateBeforeSave: false});
+                            return doc.save().then(() => {
+                                synced = true;
+                                return;
+                            }, () => {
+                                synced = false;
+                                return;
+                            });
                         });
                     });
                 });
