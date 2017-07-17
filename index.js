@@ -133,6 +133,12 @@ module.exports = class SSO extends Module {
                             }
 
                             for (let key in syncedFields) {
+                                if (doc.get(key)) {
+                                    // dont overwrite existing values (dont change username for example)
+                                    continue;
+                                }
+
+
                                 doc.set(key, syncedFields[key]);
                             }
 
@@ -200,6 +206,11 @@ module.exports = class SSO extends Module {
                             }
 
                             for (let key in syncedFields) {
+                                if (doc.get(key)) {
+                                    // dont overwrite existing values (dont change username for example)
+                                    continue;
+                                }
+
                                 doc.set(key, syncedFields[key]);
                             }
 
